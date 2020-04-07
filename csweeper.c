@@ -1,6 +1,5 @@
 /*
- * a program to listen for x bell events and run a user defined program
- * when it is caught.
+ * simple grid-based minesweeper (Daniel Jones daniel@danieljon.es)
  *
  * this program is free software: you can redistribute it and/or modify
  * it under the terms of the gnu general public license as published by

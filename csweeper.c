@@ -275,7 +275,7 @@ drawboard()
 			if (neighbormines == '0')
 				neighbormines = ' ';
 			if (tile->state & FLAGGED)
-				printf(" f ");
+				printf(" F ");
 			else if (tile->state & HIDDEN)
 				printf(" . ");
 			else

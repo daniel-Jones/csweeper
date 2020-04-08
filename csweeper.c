@@ -22,7 +22,7 @@
 
 #define WIDTH 10
 #define HEIGHT 10
-#define MINECOUNT 10
+#define MINECOUNT 17
 
 enum STATE
 {

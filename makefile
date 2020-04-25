@@ -1,25 +1,9 @@
-TARGET = csweeper
-LIBS = 
-CC = gcc
-CFLAGS = -g -Wall -Wextra -std=c99
+all: csweeper ncsweeper
 
-.PHONY: default all clean
-
-default: $(TARGET)
-all: default
-
-OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
-HEADERS = $(wildcard *.h)
-
-%.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-.PRECIOUS: $(TARGET) $(OBJECTS)
-
-$(TARGET): $(OBJECTS)
-	$(CC) $(OBJECTS) -Wall $(LIBS) -o $@
-
+csweeper: csweeper.c
+	    cc -g -Wall -Wextra -std=c99 -o csweeper csweeper.c
+ncsweeper: ncsweeper.c
+	    cc -g -Wall -Wextra -std=c99 -lncurses -o ncsweeper ncsweeper.c
 clean:
-	-rm -f *.o
-	-rm -f $(TARGET)
-
+	@rm -f csweeper ncsweeper
+	@rm -f *.o

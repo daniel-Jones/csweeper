@@ -1,3 +1,5 @@
-Simple grid-based minesweeper for the terminal in C
+csweeper: Simple grid-based minesweeper for the terminal in C
+
+ncsweeper: Simple ncurses mineswepper for the terminal in C
 
 program running: https://danieljon.es/posts/media/post111_1.png

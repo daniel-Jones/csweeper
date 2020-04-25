@@ -281,6 +281,7 @@ main(void)
 					if (tile && tile->state & HIDDEN)
 					{
 						tile->state ^= FLAGGED;
+						draw();
 					}
 					 break;
 				}

@@ -20,9 +20,9 @@
 #include <string.h>
 #include <ncurses.h>
 
-#define WIDTH 20
-#define HEIGHT 20
-#define MINECOUNT 70
+#define WIDTH 15
+#define HEIGHT 15
+#define MINECOUNT 35
 #define TILEGAP 2
 #define DOWN 0
 #define UP 1

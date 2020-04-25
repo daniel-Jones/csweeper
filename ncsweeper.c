@@ -251,6 +251,7 @@ main(void)
 	{
 		draw();
 		ch = getch(); /* blocking */
+		struct tile *tile = gettileat(cursor.x, cursor.y);
 		switch(ch)
 		{
 			case 'k':
@@ -277,7 +278,6 @@ main(void)
 				break;
 			case 'f':
 				{
-					struct tile *tile = gettileat(cursor.x, cursor.y);
 					if (tile && tile->state & HIDDEN)
 					{
 						tile->state ^= FLAGGED;
@@ -286,7 +286,8 @@ main(void)
 					 break;
 				}
 			case ' ':
-				exitgame = reveal(cursor.x, cursor.y);
+				if (tile && !(tile->state & FLAGGED))		
+					exitgame = reveal(cursor.x, cursor.y);
 				 break;
 
 			case 'q':

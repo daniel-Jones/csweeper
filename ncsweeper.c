@@ -17,7 +17,6 @@
 
 #include <stdlib.h>
 #include <time.h>
-#include <string.h>
 #include <ncurses.h>
 
 #define WIDTH 15
@@ -36,12 +35,19 @@ enum STATE
 	FLAGGED	= 1 << 2,
 };
 
+struct game
+{
+	int width;
+	int height;
+	int minecount;
+} game;
+
 struct tile
 {
 	enum STATE state;
 	int x, y;
 	int neighbormines;
-} board[WIDTH][HEIGHT]={0};
+} *board = NULL;
 
 struct cursor
 {
@@ -66,10 +72,10 @@ struct tile *getneighbors(struct tile *tile, struct tile **neighbors)
 {
 	int badup = 0, baddown = 0, badleft = 0, badright = 0;
 	if (tile->x-1<0) badleft = 1;
-	if (tile->x+1>WIDTH-1) badright = 1;
+	if (tile->x+1>game.width-1) badright = 1;
 
 	if (tile->y-1<0) badup = 1;
-	if (tile->y+1>HEIGHT-1) baddown = 1;
+	if (tile->y+1>game.height-1) baddown = 1;
 
 	if (!badleft && !badup) neighbors[0] = gettileat(tile->x-1, tile->y-1);
 	if (!badup) neighbors[1] = gettileat(tile->x, tile->y-1);
@@ -89,14 +95,14 @@ int
 checkwin()
 {
 
-	int allowedmines = MINECOUNT;
-	int safetiles = (HEIGHT * WIDTH) - MINECOUNT;
+	int allowedmines = game.minecount;
+	int safetiles = (game.height * game.width) - game.minecount;
 	int correctflags = 0;
 	int correcttiles = 0;
 
-	for (int y = 0; y < HEIGHT; y++)
+	for (int y = 0; y < game.height; y++)
 	{
-		for (int x = 0; x < WIDTH; x++)
+		for (int x = 0; x < game.width; x++)
 		{
 			struct tile *tile = gettileat(x, y);
 			if (tile->state & MINE && tile->state & FLAGGED)
@@ -115,21 +121,20 @@ generateboard()
 	srand(time(NULL));
 
 	/* place mines */
-	//printf("mines at: ");
-	for (int x = 0; x < MINECOUNT; x++)
+	board = malloc(sizeof (struct tile) * (game.width * game.height));
+	for (int x = 0; x < game.minecount; x++)
 	{
 		int mx, my;
-		mx = rand() % WIDTH;
-		my = rand() % HEIGHT;
+		mx = rand() % game.width;
+		my = rand() % game.height;
 		struct tile *tile = gettileat(mx ,my);
 		tile->state |= MINE;
-		//printf("%d, %d : ", mx, my);
 	}
 
 	/* figure out neighbors */
-	for (int y = 0; y < HEIGHT; y++)
+	for (int y = 0; y < game.height; y++)
 	{
-		for (int x = 0; x < WIDTH; x++)
+		for (int x = 0; x < game.width; x++)
 		{
 			struct tile *tile = gettileat(x, y);
 			tile->x = x;
@@ -141,8 +146,6 @@ generateboard()
 			for (int i = 0; i < 8; i++)
 				if (neighbors[i] != NULL && neighbors[i]->state & MINE)
 					tile->neighbormines += 1;
-			//if (tile->neighbormines == 0 && !(tile->state & MINE))
-				//printf("%d,%d ", tile->x, tile->y);
 		}
 	}
 }
@@ -150,9 +153,10 @@ generateboard()
 struct tile *
 gettileat(int x, int y)
 {
-	if (x < 0 || x > WIDTH-1 || y < 0 || y > HEIGHT-1)
+	if (x < 0 || x > game.width-1 || y < 0 || y > game.height-1)
 		return NULL;
-	return &board[x][y];
+	/* the board is single dimensional, so we map it as 2d */
+	return &board[game.width*x+y];
 }
 
 int
@@ -185,9 +189,9 @@ reveal(int x, int y)
 
 void
 revealmines()
-{	for (int y = 0; y < HEIGHT; y++)
+{	for (int y = 0; y < game.height; y++)
 	{
-		for (int x = 0; x < WIDTH; x++)
+		for (int x = 0; x < game.width; x++)
 		{
 			if (gettileat(x, y)->state & MINE)
 				reveal(x, y);
@@ -200,9 +204,9 @@ canmove(int dir)
 {
 	/* check if cursor inside game region */
 	if (dir == LEFT && cursor.x <= 0) return 0;
-	else if (dir == RIGHT && cursor.x >= WIDTH-1) return 0;
+	else if (dir == RIGHT && cursor.x >= game.width-1) return 0;
 	else if (dir == UP && cursor.y <= 0) return 0;
-	else if (dir == DOWN && cursor.y >= HEIGHT-1) return 0;
+	else if (dir == DOWN && cursor.y >= game.height-1) return 0;
 	return 1;
 }
 
@@ -214,12 +218,12 @@ draw()
 	box(window, 0, 0);
 	if (!exitgame)
 	{
-		mvprintw(HEIGHT+3, 0, "The aim of the game is to reveal all non-mine tiles or flag every mine tile");
-		mvprintw(HEIGHT+5, 0, "hjkl/wasd to move cursor\nspace to reveal tile\nf to flag tile");
+		mvprintw(game.height+3, 0, "The aim of the game is to reveal all non-mine tiles or flag every mine tile");
+		mvprintw(game.height+5, 0, "hjkl/wasd to move cursor\nspace to reveal tile\nf to flag tile");
 	}
-	for (int x = 0; x < WIDTH; x++)
+	for (int x = 0; x < game.width; x++)
 	{
-		for (int y = 0; y < HEIGHT; y++)
+		for (int y = 0; y < game.height; y++)
 		{
 			struct tile *tile = gettileat(x, y);
 			char neighbormines = (char)tile->neighbormines+'0';
@@ -244,7 +248,10 @@ main(void)
 {
 	initscr();
 	noecho();
-	window = newwin(HEIGHT+TILEGAP, (WIDTH*TILEGAP)+1, 1, 8);
+	game.width = WIDTH;
+	game.height = HEIGHT;
+	game.minecount = MINECOUNT;
+	window = newwin(game.height+TILEGAP, (game.width*TILEGAP)+1, 1, 8);
 	generateboard();
 	int ch;
 	while(!exitgame)
@@ -293,24 +300,27 @@ main(void)
 			case 'q':
 				exitgame = 1;
 				break;
+			default:
+				break;
 		}
 		if (checkwin())
 		{
 			revealmines();
 			draw();
-			mvprintw(HEIGHT+3, 0, "you won");
+			mvprintw(game.height+3, 0, "you won");
 			break;
 		}
 		else if (exitgame)
 		{
 			revealmines();
 			draw();
-			mvprintw(HEIGHT+3, 0, "you lost");
+			mvprintw(game.height+3, 0, "you lost");
 			break;
 		}
 	}
-	mvprintw(HEIGHT+4, 0, "press any key to exit..");
+	mvprintw(game.height+4, 0, "press any key to exit..");
 	getch();
 	endwin();
+	free(board);
 	return 0;
 }

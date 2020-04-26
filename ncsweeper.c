@@ -16,8 +16,11 @@
  */
 
 #include <stdlib.h>
+#include <unistd.h>
 #include <time.h>
+#include <sys/time.h>
 #include <ncurses.h>
+#include <string.h>
 
 #define WIDTH 15
 #define HEIGHT 15
@@ -27,6 +30,45 @@
 #define UP 1
 #define LEFT 2
 #define RIGHT 3
+
+enum DEMO_ACTION_TYPE
+{
+	NONE = 0,
+	GOUP,
+	GODOWN,
+	GOLEFT,
+	GORIGHT,
+	FLAG,
+	REVEAL,
+	QUIT,
+};
+
+struct demo_header
+{
+	int width;
+	int height;
+	int mine_count;
+};
+
+struct demo_mine
+{
+	int x;
+	int y;
+};
+
+struct demo_action
+{
+	double action_pre_delay;
+	enum DEMO_ACTION_TYPE type;
+	int start_x;
+	int start_y;
+};
+
+struct action_node
+{
+	struct demo_action *action;
+	struct action_node *next;
+} *action_head = NULL;
 
 enum STATE
 {
@@ -40,6 +82,10 @@ struct game
 	int width;
 	int height;
 	int minecount;
+	int action_count;
+	int is_demo;
+	int is_recording;
+	char demo_filename[512];
 } game;
 
 struct tile
@@ -67,6 +113,11 @@ void revealmines();
 struct tile *getneighbors(struct tile *tile, struct tile **neighbors);
 struct tile *gettileat(int x, int y);
 int checkwin();
+enum DEMO_ACTION_TYPE input();
+void free_action_list();
+struct action_node *generate_action_node(double delay, enum DEMO_ACTION_TYPE type, struct tile *tile);
+int append_action_node(struct action_node *node);
+void save_demo();
 
 struct tile *getneighbors(struct tile *tile, struct tile **neighbors)
 {
@@ -243,66 +294,245 @@ draw()
 	wrefresh(window);
 }
 
-int
-main(void)
+enum DEMO_ACTION_TYPE
+input()
 {
+	int ch = getch(); /* blocking */
+	enum DEMO_ACTION_TYPE type = NONE;
+	struct tile *tile = gettileat(cursor.x, cursor.y);
+	switch(ch)
+	{
+		case 'k':
+		case 'w':
+			if (canmove(UP))
+			{
+				type = GOUP;
+				cursor.y--;
+			}
+			break;
+
+		case 'j':
+		case 's':
+			if (canmove(DOWN))
+			{
+				type = GODOWN;
+				cursor.y++;
+			}
+			break;
+
+		case 'h':
+		case 'a':
+			if (canmove(LEFT))
+			{
+				type= GOLEFT;
+				cursor.x--;
+			}
+			break;
+		case 'l':
+		case 'd':
+			if (canmove(RIGHT))
+			{
+				type = GORIGHT;
+				cursor.x++;
+			}
+			break;
+		case 'f':
+			{
+				if (tile && tile->state & HIDDEN)
+				{
+					type = FLAG;
+					tile->state ^= FLAGGED;
+					draw();
+				}
+				 break;
+			}
+		case ' ':
+			if (tile && !(tile->state & FLAGGED))
+			{
+				type = REVEAL;
+				exitgame = reveal(cursor.x, cursor.y);
+			}
+			 break;
+
+		case 'q':
+			 type = QUIT;
+			exitgame = 1;
+			break;
+		default:
+			break;
+	}
+	return type;
+}
+
+void
+free_action_list()
+{
+	struct action_node *node;
+	while (action_head)
+	{
+		node = action_head;
+		action_head = action_head->next;
+		free(node);
+	}
+}
+
+struct action_node *generate_action_node(double delay, enum DEMO_ACTION_TYPE type, struct tile *tile)
+{
+	struct action_node *node = malloc(sizeof(struct action_node));
+	struct demo_action  *action = malloc(sizeof(struct demo_action));
+	if (!node || !action)
+		return NULL;
+	action->action_pre_delay = delay;
+	action->start_x = tile->x;
+	action->start_y = tile->y;
+	action->type = type;
+	node->action = action;
+	node->next= NULL;
+	return node;
+}
+
+int append_action_node(struct action_node *node)
+{
+	struct action_node **finger = &action_head;
+	while (*finger)
+	{
+		finger = &(*finger)->next;
+	}
+	node->next = *finger;
+	*finger = node;
+	return 1;
+}
+
+void print_nodes()
+{
+	struct action_node *finger = action_head;
+	while (finger)
+	{
+		if (finger->action)
+		{
+			printf("%d,%d\n", finger->action->start_x, finger->action->start_y);
+		}
+		finger = finger->next;
+	}
+}
+
+void
+save_demo()
+{
+	printf("saving demo to %s..\n", game.demo_filename);
+
+	/* open demo file */
+	FILE *demo = fopen(game.demo_filename, "wb");
+	if (!demo)
+	{
+		puts("cannot open demo file");
+		return;
+	}
+
+	/* generate header and write */
+	struct demo_header header;
+	header.width = game.width;
+	header.height = game.height;
+	header.mine_count = game.minecount;
+
+	fwrite(&header, sizeof(struct demo_header), 1, demo);
+
+	/* generate mines and write */
+	struct demo_mine demo_mines[game.minecount];
+	/* loop over every tile and save it if it's a mine */
+	int i = 0;
+	for (int x = 0; x < game.width; x++)
+	{
+		for (int y = 0; y < game.height; y++)
+		{
+			struct tile *tile = gettileat(x, y);
+			if (tile->state & MINE)
+			{
+				demo_mines[i].x = tile->x;
+				demo_mines[i].y = tile->y;
+				fwrite(&demo_mines[i], sizeof(struct demo_mine), 1, demo);
+				i++;
+			}
+		}
+	}
+
+	/* walk action list and write it to file */
+	fwrite(&game.action_count, sizeof game.action_count, 1, demo);
+	/* skip first node */
+	if (!action_head->next)
+	{
+		puts("cannot write demo file, no actions exist..");
+		fclose(demo);
+		return;
+	}
+	struct action_node *finger = action_head->next;
+	int x = 0;
+	while (finger)
+	{
+		fwrite(&finger, sizeof(struct action_node), 1, demo);
+		finger = finger->next;
+		x++;
+	}
+		printf("saved 0x%x nodes\n", x);
+	fclose(demo);
+}
+
+int
+main(int argc, char **argv)
+{
+	game.is_demo = 0;
+	game.is_recording = 0;
+	if ((argc > 1 && argc != 3))
+	{
+		printf("usage: %s [-record save.dem | -play load.dem]\n", argv[0]);
+		goto safe_exit;
+	}
+	if (argc == 3)
+	{
+		if (strcmp(argv[1], "-record") == 0)
+		{
+			game.is_recording = 1;
+			strncpy(game.demo_filename, argv[2], 511);
+		}
+		else if (strcmp(argv[1], "-play") == 0)
+		{
+			game.is_demo = 1;
+			strncpy(game.demo_filename, argv[2], 511);
+		}
+		else
+		{
+			printf("usage: %s [-record save.dem | -play load.dem]\n", argv[0]);
+			goto safe_exit;
+		}
+	}
 	initscr();
 	noecho();
 	game.width = WIDTH;
 	game.height = HEIGHT;
 	game.minecount = MINECOUNT;
+	game.action_count = 0;
 	window = newwin(game.height+TILEGAP, (game.width*TILEGAP)+1, 1, 8);
 	generateboard();
-	int ch;
+	action_head = malloc(sizeof(struct action_node));
+	action_head->action = NULL;
+	action_head->next = NULL;
+	if (!action_head)
+		goto safe_exit;
+	struct timespec begin, end;
+	double move_us;
 	while(!exitgame)
 	{
 		draw();
-		ch = getch(); /* blocking */
-		struct tile *tile = gettileat(cursor.x, cursor.y);
-		switch(ch)
-		{
-			case 'k':
-			case 'w':
-				if (canmove(UP))
-					cursor.y--;
-				break;
-
-			case 'j':
-			case 's':
-				if (canmove(DOWN))
-					cursor.y++;
-				break;
-
-			case 'h':
-			case 'a':
-				if (canmove(LEFT))
-					cursor.x--;
-				break;
-			case 'l':
-			case 'd':
-				if (canmove(RIGHT))
-					cursor.x++;
-				break;
-			case 'f':
-				{
-					if (tile && tile->state & HIDDEN)
-					{
-						tile->state ^= FLAGGED;
-						draw();
-					}
-					 break;
-				}
-			case ' ':
-				if (tile && !(tile->state & FLAGGED))		
-					exitgame = reveal(cursor.x, cursor.y);
-				 break;
-
-			case 'q':
-				exitgame = 1;
-				break;
-			default:
-				break;
-		}
+		clock_gettime(CLOCK_MONOTONIC, &begin);
+		enum DEMO_ACTION_TYPE type = input();
+		clock_gettime(CLOCK_MONOTONIC, &end);
+		move_us = (end.tv_sec - begin.tv_sec) * 1000.0;
+		move_us += (end.tv_nsec - begin.tv_nsec) / 1000000.0;
+		move_us *= 1000;
+		struct action_node *move = generate_action_node(move_us, type, gettileat(cursor.x, cursor.y));
+		append_action_node(move);
+		game.action_count++;
+		//printf("%.3f us elapsed\n", move_us);
 		if (checkwin())
 		{
 			revealmines();
@@ -320,7 +550,13 @@ main(void)
 	}
 	mvprintw(game.height+4, 0, "press any key to exit..");
 	getch();
+safe_exit:
+	delwin(window);
 	endwin();
+	if (game.is_recording)
+		save_demo();
 	free(board);
+	printf("0x%x\n", game.action_count);
+	free_action_list();
 	return 0;
 }

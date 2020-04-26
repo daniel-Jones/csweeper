@@ -1,5 +1,10 @@
+
+ncsweeper: ncurses minesweeper in C. features demo recording and demo playback. 
+To record a demo: ./ncsweeper -record demofile.dem
+To play a demo: ./ncsweeper -play demofile.dem
+
 csweeper: Simple grid-based minesweeper for the terminal in C
 
-ncsweeper: Simple ncurses mineswepper for the terminal in C
+demo record/playback: http://gnupluslinux.com/~daniel/demo.mp4
 
-program running: https://danieljon.es/posts/media/post111_1.png
+grid based: https://danieljon.es/posts/media/post111_1.png

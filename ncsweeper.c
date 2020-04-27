@@ -701,6 +701,7 @@ main(int argc, char **argv)
 		}
 	}
 	mvprintw(game.height+4, 0, "press any key to exit..");
+	flushinp();
 	getch();
 safe_exit:
 	delwin(window);

@@ -284,12 +284,15 @@ void
 draw()
 {
 	wclear(window);
-	clear();
 	box(window, 0, 0);
 	if (!exitgame)
 	{
 		mvprintw(game.height+3, 0, "The aim of the game is to reveal all non-mine tiles or flag every mine tile");
 		mvprintw(game.height+5, 0, "hjkl/wasd to move cursor\nspace to reveal tile\nf to flag tile");
+	}
+	else
+	{
+		clear();
 	}
 	for (int x = 0; x < game.width; x++)
 	{
@@ -683,6 +686,7 @@ main(int argc, char **argv)
 		}
 		if (checkwin())
 		{
+			exitgame = 1;
 			revealmines();
 			draw();
 			mvprintw(game.height+3, 0, "you won");

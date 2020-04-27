@@ -24,7 +24,7 @@
 
 #define WIDTH 15
 #define HEIGHT 15
-#define MINECOUNT 20
+#define MINECOUNT 31
 #define TILEGAP 2
 #define DOWN 0
 #define UP 1
@@ -172,9 +172,9 @@ int
 generateboard()
 {
 	srand(time(NULL));
-	board = malloc(sizeof (struct tile) * (game.width * game.height));
 	if (!game.is_demo)
 	{
+		board = malloc(sizeof (struct tile) * (game.width * game.height));
 		/* place mines */
 		int mx, my;
 		for (int x = 0; x < game.minecount; x++)
@@ -198,6 +198,8 @@ place_mine:
 		}
 	}
 
+	/* create window here because if we're playing a demo we need the width/height */
+	window = newwin(game.height+TILEGAP, (game.width*TILEGAP)+1, 1, 8);
 	/* figure out neighbors */
 	for (int y = 0; y < game.height; y++)
 	{
@@ -513,7 +515,8 @@ load_demo()
 	game.width = header.width;
 	game.height = header.height;
 	game.minecount = header.mine_count;
-
+	/* malloc board here because we need the header information from the demo */
+	board = malloc(sizeof (struct tile) * (game.width * game.height));
 	/* read and set mine data */
 	struct demo_mine demo_mine;
 	for (int mc = 0; mc < game.minecount; mc++)
@@ -643,7 +646,6 @@ main(int argc, char **argv)
 	game.height = HEIGHT;
 	game.minecount = MINECOUNT;
 	game.action_count = 0;
-	window = newwin(game.height+TILEGAP, (game.width*TILEGAP)+1, 1, 8);
 	action_head = malloc(sizeof(struct action_node));
 	action_head->action = NULL;
 	action_head->next = NULL;

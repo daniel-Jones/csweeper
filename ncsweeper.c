@@ -153,9 +153,9 @@ checkwin()
 	int correctflags = 0;
 	int correcttiles = 0;
 
-	for (int y = 0; y < game.height; y++)
+	for (int x = 0; x < game.width; x++)
 	{
-		for (int x = 0; x < game.width; x++)
+		for (int y = 0; y < game.height; y++)
 		{
 			struct tile *tile = gettileat(x, y);
 			if (tile->state & MINE && tile->state & FLAGGED)
@@ -226,7 +226,7 @@ gettileat(int x, int y)
 	if (x < 0 || x > game.width-1 || y < 0 || y > game.height-1 || board == NULL)
 		return NULL;
 	/* the board is single dimensional, so we map it as 2d */
-	return &board[game.width*x+y];
+	return &board[game.height*x+y];
 }
 
 int
